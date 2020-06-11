@@ -1,0 +1,185 @@
+load "msh3"
+load "tetgen"
+load "medit"
+verbosity=1;
+
+real Stepsplot = 100; // write solution to a file every X steps
+real Steps2 = 1; // output solution statistics every X steps
+
+mesh Th=square(10,10,[x*pi-pi/2,2*y*pi]);  //  $]\frac{-pi}{2},\frac{-pi}{2}[\times]0,2\pi[ $
+//  a parametrization of a sphere 
+func f1 =cos(x)*cos(y);
+func f2 =1*cos(x)*sin(y);
+func f3 = sin(x);
+//  partial derivative of the parametrization DF
+func f1x=sin(x)*cos(y);   
+func f1y=-cos(x)*sin(y);
+func f2x=-1*sin(x)*sin(y);
+func f2y=1*cos(x)*cos(y);
+func f3x=cos(x);
+func f3y=0;
+// $  M = DF^t DF $
+func m11=f1x^2+f2x^2+f3x^2;
+func m21=f1x*f1y+f2x*f2y+f3x*f3y;
+func m22=f1y^2+f2y^2+f3y^2;
+
+func perio=[[4,y],[2,y],[1,x],[3,x]];  
+real hh=0.1;
+real vv= 1/square(hh);
+Th=adaptmesh(Th,m11*vv,m21*vv,m22*vv,IsMetric=1,periodic=perio);
+Th=adaptmesh(Th,m11*vv,m21*vv,m22*vv,IsMetric=1,periodic=perio);
+// plot(Th,wait=1);
+medit("squaremesh",Th,wait=1);
+
+real L = 10; // domain size parameter
+
+// construction of the surface of spheres
+real Rmin  = 0.8*L;
+func f1min = 2*Rmin*f1;
+func f2min = Rmin*f2;
+func f3min = Rmin*f3;
+
+cout << "=====================" << endl;
+cout << "=====================" << endl;
+meshS Th3sph=movemesh23(Th,transfo=[f1min,f2min,f3min],orientation=-1);
+cout << "=====================" << endl;
+cout << "=====================" << endl;
+//savemesh(Th3sph,"sphereR1.mesh");
+//medit("sphereR1",wait=1,Th3sph);
+real Rmax  = L;
+func f1max = 2*Rmax*f1;
+func f2max = Rmax*f2;
+func f3max = Rmax*f3;
+cout << "=====================" << endl;
+cout << "=====================" << endl;
+meshS Th3sph2=movemesh23(Th,transfo=[f1max,f2max,f3max],orientation=1);
+cout << "=====================" << endl;
+cout << "=====================" << endl;
+//savemesh(Th3sph2,"sphereR2.mesh");
+cout << "addition" << endl;
+meshS Th3=Th3sph+Th3sph2;
+//savemesh(Th3,"sphereAdd.mesh");
+//medit("sphereSurfaceAdd",wait=1,Th3);
+
+
+real[int] domain2 = [1.5,0.,0.,145,0.001,0.5,0.,0.,18,0.01];
+cout << "==============================" << endl;
+cout << " tetgen call without hole " << endl;
+cout << "==============================" << endl;
+mesh3 Th3fin=tetg(Th3,switch="aAAYYCCVq2",nbofregions=2,regionlist=domain2); // the smaller the parameter q, the finer the tetrahedral mesh
+cout << "=============================" << endl;
+cout << "finish: tetgen call without hole" << endl;
+cout << "=============================" << endl;
+//savemesh(Th3fin,"spherewithtworegion.mesh"); 
+//medit("spherewithtworegion",wait=1,Th3fin);
+
+real[int] hole = [0.,0.,0.];
+real[int] domain = [1.5,0.,0.,53,0.001];
+cout << "=============================" << endl;
+cout << "  tetgen call with hole   " << endl;
+cout << "=============================" << endl;
+mesh3 Th3finhole=tetg(Th3,switch="aYYAACCVq1",nbofholes=1,holelist=hole,nbofregions=1,regionlist=domain); // need to increase mesh quality here somehow DP 11/10
+cout << "=============================" << endl;
+cout << "finish: tetgen call with hole   " << endl;
+cout << "=============================" << endl;
+//savemesh(Th3finhole,"spherewithahole.mesh"); 
+medit("spherewithahole",wait=1,Th3finhole);
+
+// 
+// // 
+// // // PDE related code below
+// //
+//
+
+// Model parameters
+real D1 = 0.2;
+real D2 = 0.2;
+real D3 = 0.2;
+real D4 = 0.2;
+real khi1 = 1.5; 
+real khi2 = 1.5;
+
+real rhoE = 0.5;
+real rhoN = 0.5;
+
+real k1 = 2;
+real k2 = 2;
+
+string name = "run0";
+real solmin = 100000;
+
+func real phi(real z){ 
+	return 1.2*z*exp(-1.2*z); 
+}
+// Computational parameters
+int i = 0;
+int n = 1000; // total number of time steps
+real dt = 0.1; // time discretisation parameter
+real t = 0;
+
+randinit(345634576223); // initialize the RNG
+
+fespace Vh(Th3finhole, P1);
+Vh E, tE;
+Vh pE = 0.1+0.9*randreal1();
+Vh EC, tEC;
+Vh pEC = 0.5; 
+Vh N, tN;
+Vh pN = 1.2-pE;
+Vh NC, tNC;
+Vh pNC = 0.5; 
+
+// Weak formulation fo the model
+problem KS( [E,EC,N,NC] , [tE,tEC,tN,tNC] ) = 
+	// 1st coupled Keller-Segel system -> Enthorinal cortex
+	int3d(Th3finhole)( E*tE + D1*dt*( dx(E)*dx(tE)+dy(E)*dy(tE)+dz(E)*dz(tE) ) )
+	- int3d(Th3finhole)( pE*tE + khi1*dt*phi(pE)*( dx(pEC)*dx(tE)+dy(pEC)*dy(tE)+dz(pEC)*dz(tE) ) )
+	- int3d(Th3finhole)( dt*pE*(1-pE-k1*pN)*tE)
+	- int3d(Th3finhole)( dt*rhoE*tE ) // gradient goes in here
+	+ int3d(Th3finhole)( EC*tEC + D2*dt*( dx(EC)*dx(tEC)+dy(EC)*dy(tEC)+dz(EC)*dz(tEC) ) )
+	- int3d(Th3finhole)( pEC*tEC + dt*pE*tEC - dt*pEC*tEC )
+	// 2nd coupled Keller-Segel system -> Neocortex
+	+ int3d(Th3finhole)( N*tN + D3*dt*( dx(N)*dx(tN)+dy(N)*dy(tN)+dz(N)*dz(tN) ) )
+	- int3d(Th3finhole)( pN*tN + khi2*dt*phi(pN)*( dx(pNC)*dx(tN)+dy(pNC)*dy(tN)+dz(pNC)*dz(tN) ) )
+	- int3d(Th3finhole)( dt*pN*(1-pN-k2*pE)*tN )
+	- int3d(Th3finhole)( dt*(rhoN)*tN )
+	+ int3d(Th3finhole)( NC*tNC + D4*dt*( dx(NC)*dx(tNC)+dy(NC)*dy(tNC)+dz(NC)*dz(tNC) ) )
+	- int3d(Th3finhole)( pNC*tNC + dt*pN*tNC - dt*pNC*tNC )
+;
+
+include "ffmatlib.idp"
+
+// Computational loop, plots
+while (i < n) {
+	i++;
+	t=t+dt;
+	if (Stepsplot%i == 0 || i ==1){
+		cout << "  t =   " << t << endl ; 		
+	}
+	KS;
+	if ( min(E[].min, EC[].min, N[].min, NC[].min) < solmin ) {
+		solmin = min(E[].min, EC[].min, N[].min, NC[].min);
+	}
+	pE=E;
+	pN=N;
+	pEC=EC;
+	pNC=NC;
+}
+cout << " Running minimum of the solution: " << solmin << endl ; 
+// save the solution and mesh for plotting in Matlab
+
+savemesh(Th3finhole,"4speciesKS_final.mesh");
+//Save finite element space connectivity
+ffSaveVh(Th3finhole,Vh,"4speciesKS_vh.txt");
+//Save some scalar data
+ffSaveData(E,"solution_Ent_final.txt");
+ffSaveData(N,"solution_Neo_final.txt");
+ffSaveData(EC,"solution_CEnt_final.txt");
+ffSaveData(NC,"solution_CNeo_final.txt");
+
+
+// Plot the solution in medit for analysis
+medit("Enthorinal",Th3finhole,E,wait=0);
+
+
+

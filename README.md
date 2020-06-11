@@ -6,11 +6,14 @@ Files with the .edp extension are for the freely available finite element PDE so
 * The ffmatlib folder contains codes needed to interpret FreeFEM meshes and solution output in MATLAB.
 * ffmatlib.idp is a library which contains functions to write FreeFEM output to files (it should be in the same parent folder as the .edp file you want to run).
 
-## 1D Simulation
+## 1D Simulations
 
-## 2D Simulation
+## 2D Simulations
+These codes produce Math Supplement Figure 7
+* 2D_square_linear_gradient.edp
+* plot2D_square
 
-## 3D Simulation
+## 3D Simulations
 These codes produce Math Supplement Figure 10
 * 3D_simulation.edp
 * plot3D_slice.m 

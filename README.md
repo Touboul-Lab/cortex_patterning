@@ -1,7 +1,10 @@
 # cortex_patterning
 Repository of codes to solve PDEs and process output for models of cortical patterning/neural fate in brain development.
 
-Files with the .edp extension are for the freely available finite element PDE solver FreeFEM (https://freefem.org/). The ffmatlib folder contains codes needed to interpret FreeFEM meshes and solution output in MATLAB.
+Files with the .edp extension are for the freely available finite element PDE solver FreeFEM (https://freefem.org/). 
+
+* The ffmatlib folder contains codes needed to interpret FreeFEM meshes and solution output in MATLAB.
+* ffmatlib.idp is a library which contains functions to write FreeFEM output to files (it should be in the same parent folder as the .edp file you want to run).
 
 ## 1D Simulation
 

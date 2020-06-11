@@ -1,0 +1,137 @@
+verbosity = 0;
+// Model parameters
+real D1 = 0.2;
+real D2 = 0.2;
+real D3 = 0.2;
+real D4 = 0.2;
+real khi1 = 1.5;
+real khi2 = 1.5;
+
+real k1 = 2;
+real k2 = 2;
+
+string name = "run0";
+real L = 40;
+real solmin = 100000;
+
+func real phi(real z){ 
+	return 1.2*z*exp(-1.2*z); 
+}
+
+// pos should be in [0,1], i.e. fraction of the domain
+
+real p1 = 0.48;
+real p2 = 0.52;
+real rhoLow = 0.3;
+real rhoHigh = 0.5;
+
+func real gradient(real pos, real P1, real P2, real rho1, real rho2){ 
+	real temp = 0;
+	if (pos <= P1){
+		temp = rho1;
+	}
+	if (pos>P1 && pos<P2){ 
+		temp = rho1 + ((rho2-rho1)/(P2-P1))*(pos-P1);
+	}
+	if (pos > P2) {
+		temp = rho2;
+	}
+	return temp;
+}
+
+// Computational parameters
+include "ffmatlib.idp"
+
+int nx=100;
+int ny=100;
+int i=0;
+int n=500;
+real Steps2=50;
+real Stepsplot=250; // write solution to a file every x steps
+real dt=0.2;
+real t=0;
+
+// Define mesh 
+mesh Th = square ( nx, ny, [ L*x, L*y ] );
+
+randinit(14633); // initialize the RNG
+
+fespace Vh(Th,P1);
+Vh E, tE;
+Vh pE = 0.1+0.9*randreal1();
+Vh EC, tEC;
+Vh pEC = 0.5; 
+Vh N, tN;
+Vh pN = 0.1+0.9*randreal1();
+Vh NC, tNC;
+Vh pNC = 0.5; 
+
+// Weak formulation fo the model
+problem KS( [E,EC,N,NC] , [tE,tEC,tN,tNC] ) = 
+	// 1st coupled Keller-Segel system -> Enthorinal cortex
+	int2d(Th)( E*tE + D1*dt*( dx(E)*dx(tE)+dy(E)*dy(tE) ) )
+	- int2d(Th)( pE*tE + khi1*dt*phi(pE)*( dx(pEC)*dx(tE)+dy(pEC)*dy(tE) ) )
+	- int2d(Th)( dt*pE*(1-pE-k1*pN)*tE)
+	- int2d(Th)( dt*( gradient(x/L, p1, p2, rhoHigh, rhoLow) )*tE ) // gradient goes in here
+	+ int2d(Th)( EC*tEC + D2*dt*( dx(EC)*dx(tEC)+dy(EC)*dy(tEC) ) )
+	- int2d(Th)( pEC*tEC + dt*pE*tEC - dt*pEC*tEC )
+	// 2nd coupled Keller-Segel system -> Neocortex
+	+ int2d(Th)( N*tN + D3*dt*( dx(N)*dx(tN)+dy(N)*dy(tN) ) )
+	- int2d(Th)( pN*tN + khi2*dt*phi(pN)*( dx(pNC)*dx(tN)+dy(pNC)*dy(tN) ) )
+	- int2d(Th)( dt*pN*(1-pN-k2*pE)*tN )
+	- int2d(Th)( dt*( gradient(x/L, p1, p2, rhoLow, rhoHigh) )*tN )
+	+ int2d(Th)( NC*tNC + D4*dt*( dx(NC)*dx(tNC)+dy(NC)*dy(tNC) ) )
+	- int2d(Th)( pNC*tNC + dt*pN*tNC - dt*pNC*tNC )
+;
+
+// Computational loop, plots
+while (i < n) {
+	i++;
+	t=t+dt;
+	cout << "  t =   " << t << endl ; 
+	KS;
+	if ( min(E[].min, EC[].min, N[].min, NC[].min) < solmin ) {
+		solmin = min(E[].min, EC[].min, N[].min, NC[].min);
+	}
+	if (i%Steps2==0) {
+		cout << " " << endl;
+		cout << " Running minimum of solution: " << solmin << endl;
+		cout << " Current minimum of solution: " << min(E[].min, EC[].min, N[].min, NC[].min) << endl;
+		cout << " Relative error in L1 norm : " << max(int2d(Th)( abs(N-pN) )/int2d(Th)( abs(pN) ), int2d(Th)( abs(NC-pNC) )/int2d(Th)( abs(pNC) ), int2d(Th)( abs(E-pE) )/int2d(Th)( abs(pE) ), int2d(Th)( abs(EC-pEC) )/int2d(Th)( abs(pEC) )) << endl; 
+
+		//plot(E, fill=1, value=1, grey=0, wait = 0);
+		}
+	pE=E;
+	pN=N;
+	pEC=EC;
+	pNC=NC;
+	
+	if (i%Stepsplot==0 || i==1) {
+		// save the solution and mesh for plotting in Matlab
+		//Save mesh
+		string file1 = "4speciesKS" + string(i) + name + ".msh";
+		string file2 = "4speciesKS_vh" + string(i) + name + ".txt";
+		string file3 = "solution_Ent" + string(i) + name + ".txt";
+		string file4 = "solution_Neo" + string(i) + name + ".txt";
+
+		savemesh(Th,file1);
+		//Save finite element space connectivity
+		ffSaveVh(Th,Vh,file2);
+		//Save some scalar data
+		ffSaveData(E,file3);
+		ffSaveData(N,file4);
+		}
+}
+// save solution at the last time step
+string file1 = "4speciesKS" + string(i) + name + ".msh";
+		string file2 = "4speciesKS_vh" + string(n) + name + ".txt";
+		string file3 = "solution_Ent" + string(n) + name + ".txt";
+		string file4 = "solution_Neo" + string(n) + name + ".txt";
+
+		savemesh(Th,file1);
+		//Save finite element space connectivity
+		ffSaveVh(Th,Vh,file2);
+		//Save some scalar data
+		ffSaveData(E,file3);
+		ffSaveData(N,file4);
+

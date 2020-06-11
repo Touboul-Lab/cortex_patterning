@@ -8,6 +8,7 @@ Files with the .edp extension are for the freely available finite element PDE so
 ## 2D Simulation
 
 ## 3D Simulation
+These codes produce Math Supplement Figure 10
 * 3D_simulation.edp
 * plot3D_slice.m 
 

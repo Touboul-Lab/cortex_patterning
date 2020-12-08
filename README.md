@@ -1,5 +1,8 @@
 # cortex_patterning
-Repository of codes to solve PDEs and process output for models of cortical patterning/neural fate in brain development.
+Repository of codes to: 
+
+1. solve PDEs and process output for models of cortical patterning/neural fate in brain development.
+2. Process cortical imaging data and compute statistics on this data
 
 Files with the .edp extension are for the freely available finite element PDE solver FreeFEM (https://freefem.org/). 
 
